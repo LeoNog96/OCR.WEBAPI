@@ -4,15 +4,11 @@ import shutil
 import textract
 import time
 import datetime
-import storage
 import json
-from libs.customEncoder import CustomEncoder 
-from bd import Bd
 import multiprocessing
 import subprocess
-from elastic import Elastic
-import removeAc
-import xml_parser
+from .removeAc import *
+from .xml_parser import * 
 
 
 class Ocr:
@@ -132,47 +128,63 @@ class Ocr:
 
         languages = 'por'
 
-        print("começo do lote N-PDF, será processados "+str(len(queue))+" arquivos")
+        print("Nova Requisição")
         print("-------------------------------------------------------------")
 
-        try:
-                        
+        try:                    
+            extension = '.doc'          
+            arquivo = open('/home/leonardo/Roteiro de instalação elasticSearch.doc','rb')            
+            files = arquivo.read()
+            arquivo.close()
+            path = str(os.getcwd())+'/app/ocr_service/queue/'
+
             cron = datetime.datetime.now()
-            id = 1
-            f = open(str(os.getcwd())+'/queue/'str(id)+'.txt', 'w+b')
-            binary_format = bytearray(files)
-            f.write(binary_format)
-            f.close()
-            
-            print("N-PDF - Processando o arquivo: "+ queue[item]+" às "+cron.strftime("%d-%m-%y-%H:%M:%S")+"\n")
+            item = str("cron")+extension
+            out = open(path+item,'wb')
+            out.write(files)
+            out.close()
+
+        
+            print("N-PDF - Processando o arquivo: "+item+" às "+cron.strftime("%d-%m-%y-%H:%M:%S")+"\n")
             
             #processamento do Arquivo
                     
-            if ".pdf" in str(queue[item]):
+            if ".pdf" in item:
                 
-                text = textract.process((str(os.getcwd())+'/queue/'+str(queue[item])), method='tesseract' ,language=languages)
-                return removeAc.remover_acentos(str(text.decode('utf8')+""))
+                text = textract.process(path+item, method='tesseract' ,language=languages)
+                os.remove(path+item)
+                print("N-PDF Terminou o arquivo: "+ item+" às "+ datetime.datetime.now().strftime("%d-%m-%y-%H:%M:%S")+ " demorou = "+str(datetime.datetime.now() - cron))
+                print("----------------\n")
+                return remover_acentos(str(text.decode('utf8')+""))
 
-            elif ".msg" in str(queue[item]):
+            elif ".msg" in item:
 
-                text = textract.process((str(os.getcwd())+'/queue/'+str(queue[item])), method='msg-extractor',language=languages)
-                removeAc.remover_acentos(str(text.decode('utf8')+""))
+                text = textract.process(path+item, method='msg-extractor',language=languages)
+                os.remove(path+item)
+                print("N-PDF Terminou o arquivo: "+ item+" às "+ datetime.datetime.now().strftime("%d-%m-%y-%H:%M:%S")+ " demorou = "+str(datetime.datetime.now() - cron))
+                print("----------------\n")
+                return remover_acentos(str(text.decode('utf8')+""))
             
-            elif ".xml" in str(queue[item]):
+            elif ".xml" in item:
 
-                text = xml_parser.xmlParser(str(os.getcwd())+'/queue/'+str(queue[item]))
-                return removeAc.remover_acentos(text)
+                text = xml_parser.xmlParser(path+item)
+                os.remove(path+item)
+                print("N-PDF Terminou o arquivo: "+ item+" às "+ datetime.datetime.now().strftime("%d-%m-%y-%H:%M:%S")+ " demorou = "+str(datetime.datetime.now() - cron))
+                print("----------------\n")
+                return remover_acentos(text)
 
             else:
-
-                text = textract.process((str(os.getcwd())+'/queue/'+str(queue[item])),language=languages)
-                return removeAc.remover_acentos(str(text.decode('utf8')+""))
+                print("foi "+item)
+                text = textract.process(path+item,language=languages)
+                os.remove(path+item)
+                print("N-PDF Terminou o arquivo: "+ item+" às "+ datetime.datetime.now().strftime("%d-%m-%y-%H:%M:%S")+ " demorou = "+str(datetime.datetime.now() - cron))
+                print("----------------\n")
+                return remover_acentos(str(text.decode('utf8')+""))
                 
             
-            os.remove(str(os.getcwd())+'/queue/'+str(queue[item]))
+            
         
-            print("N-PDF Terminou o arquivo: "+ queue[item]+" às "+ datetime.datetime.now().strftime("%d-%m-%y-%H:%M:%S")+ " demorou = "+str(datetime.datetime.now() - cron))
-            print("----------------\n")
+            
             
             arquivos +=1
             queue = os.listdir(str(os.getcwd())+'/queue/')
@@ -181,16 +193,18 @@ class Ocr:
 
             print("Erro ao ler .doc, exportando para PDF")                      
             
-            t = os.system("libreoffice --headless --convert-to pdf:writer_pdf_Export --outdir "+str(os.getcwd())+'/queuePDF/ '+str(os.getcwd())+'/queue/'+str(queue[item]))
-            os.remove(str(os.getcwd())+'/queue/'+str(queue[item]))
-            queue = os.listdir(str(os.getcwd())+'/queue/')
+            t = os.system("libreoffice --headless --convert-to pdf:writer_pdf_Export --outdir "+path+'/export.pdf')
+            os.remove(path+item)
             
             print("Exportação Finalizada com sucesso\n")
+
+            text = textract.process(path+'export.pdf', method='tesseract' ,language=languages)
+            return removeAc.remover_acentos(str(text.decode('utf8')+""))
             
         except Exception as identifier:
             print(identifier) 
-            print("---Não foi possivel processar o arquivo: " + queue[item]+"---\n")
+            #print("---Não foi possivel processar o arquivo: " + queue[item]+"---\n")
             #print(identifier)
-            os.remove(str(os.getcwd())+'/queue/'+str(queue[item]))
+            #os.remove(str(os.getcwd())+'/queue/'+str(queue[item]))
             
             return None     
